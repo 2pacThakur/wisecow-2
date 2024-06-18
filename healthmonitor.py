@@ -1,17 +1,12 @@
-import os
-import paramiko
-from scp import SCPClient
+import psutil
 import logging
 from datetime import datetime
 
 # Configuration
-SOURCE_DIR = '/path/to/source/directory'  
-REMOTE_HOST = 'remote.server.com'         
-REMOTE_PORT = 22                          
-REMOTE_USER = 'username'                 
-REMOTE_PASS = 'password'                 
-REMOTE_DIR = '/path/to/remote/directory'  
-LOG_FILE = 'backup.log'
+CPU_THRESHOLD = 80  # CPU usage percentage
+MEMORY_THRESHOLD = 80  # Memory usage percentage
+DISK_THRESHOLD = 80  # Disk usage percentage
+LOG_FILE = 'system_health.log'
 
 # Setup logging
 logging.basicConfig(
@@ -20,44 +15,49 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 
-def create_ssh_client(host, port, user, password):
-    """Create and return an SSH client connected to the remote host."""
-    client = paramiko.SSHClient()
-    client.load_system_host_keys()
-    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    client.connect(host, port, user, password)
-    return client
+def log_alert(message):
+    """Log an alert message to the log file."""
+    logging.warning(message)
+    print(message)
 
-def backup_directory(source_dir, remote_dir, ssh_client):
-    """Backup the specified directory to the remote directory."""
-    try:
-        with SCPClient(ssh_client.get_transport()) as scp:
-            scp.put(source_dir, recursive=True, remote_path=remote_dir)
-        return True
-    except Exception as e:
-        logging.error(f"Failed to backup directory: {e}")
-        return False
+def check_cpu_usage():
+    """Check the CPU usage and log an alert if it exceeds the threshold."""
+    cpu_usage = psutil.cpu_percent(interval=1)
+    if cpu_usage > CPU_THRESHOLD:
+        log_alert(f"High CPU usage detected: {cpu_usage}%")
+
+def check_memory_usage():
+    """Check the memory usage and log an alert if it exceeds the threshold."""
+    memory_info = psutil.virtual_memory()
+    memory_usage = memory_info.percent
+    if memory_usage > MEMORY_THRESHOLD:
+        log_alert(f"High memory usage detected: {memory_usage}%")
+
+def check_disk_usage():
+    """Check the disk usage and log an alert if it exceeds the threshold."""
+    disk_usage = psutil.disk_usage('/')
+    if disk_usage.percent > DISK_THRESHOLD:
+        log_alert(f"High disk usage detected: {disk_usage.percent}% on /")
+
+def check_running_processes():
+    """Check the running processes and log an alert if any process exceeds the threshold."""
+    for proc in psutil.process_iter(['pid', 'name', 'cpu_percent', 'memory_percent']):
+        try:
+            cpu_percent = proc.info['cpu_percent']
+            memory_percent = proc.info['memory_percent']
+            if cpu_percent > CPU_THRESHOLD or memory_percent > MEMORY_THRESHOLD:
+                log_alert(f"High resource usage detected: PID={proc.info['pid']}, "
+                          f"Name={proc.info['name']}, CPU={cpu_percent}%, Memory={memory_percent}%")
+        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+            pass
 
 def main():
-    logging.info("Starting backup process...")
-    start_time = datetime.now()
-    
-    try:
-        ssh_client = create_ssh_client(REMOTE_HOST, REMOTE_PORT, REMOTE_USER, REMOTE_PASS)
-        logging.info("SSH connection established.")
-    except Exception as e:
-        logging.error(f"SSH connection failed: {e}")
-        return
-
-    if backup_directory(SOURCE_DIR, REMOTE_DIR, ssh_client):
-        end_time = datetime.now()
-        duration = (end_time - start_time).total_seconds()
-        logging.info(f"Backup completed successfully in {duration:.2f} seconds.")
-    else:
-        logging.error("Backup failed.")
-    
-    ssh_client.close()
-    logging.info("SSH connection closed.")
+    logging.info("Starting system health monitoring...")
+    check_cpu_usage()
+    check_memory_usage()
+    check_disk_usage()
+    check_running_processes()
+    logging.info("System health check completed.")
 
 if __name__ == '__main__':
     main()
