@@ -1,0 +1,16 @@
+# Automated Backup Script
+
+This script automates the backup of a specified directory to a local backup directory. It logs the success or failure of each backup operation.
+
+## Usage
+
+1. **Edit Configuration**: Update `SOURCE_DIR` and `BACKUP_DIR` in `backup_script.py`.
+2. **Run Script**: Execute with `python backup_script.py`.
+
+## Configuration
+
+Edit `backup_script.py` to update the following variables:
+```python
+SOURCE_DIR = '/path/to/source/directory'
+BACKUP_DIR = '/path/to/backup/directory'
+LOG_FILE = 'backup.log'
